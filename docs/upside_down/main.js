@@ -1,6 +1,9 @@
 title = "UPSIDE DOWN";
 3
 description = `
+[Tap]     Jump
+[Hold]    Rise
+[Release] Change Zone
 `;
 
 characters = [
@@ -25,24 +28,52 @@ RRRRRR
  ll
  ll
  ll
- `,`
+ `,
+ //bullet
+ `
  l rrrr
  l rrrrr
  l rrrrr
  l rrrr
+ `,
+ //coin_1 e
+ `
+ LLLL
+LyyyyL
+LyyyyL
+LyyyyL
+LyyyyL
+ LLLL
+ `,//coin_2 f
+ `
+  LLLL
+ Ly  yL
+ Ly  yL
+ Ly  yL
+ Ly  yL
+  LLLL
+ `,
+ //大炮 g
+ `
+  rr
+ rrrr
+yrrrry
+y    y
+y    y
  `
 ];
 
 const G = {
   WIDTH: 250,
-  HEIGHT: 150
+  HEIGHT: 200 
 };
 
 options = {
   viewSize: {x: G.WIDTH, y: G.HEIGHT},
+  theme: "pixel",
   isReplayEnabled: true,
   isPlayingBgm: true,
-  seed: 1,
+  seed: 3,
 };
 
 /**
@@ -50,9 +81,6 @@ options = {
  */
 let floors;
 let nextFloorDist;
-
-/** @type {Vector[]} */
-let coins;
 
 /**
  * type {{
@@ -63,6 +91,23 @@ let coins;
  */
 let bullets;
 let nextBulletDist;
+let coins_1;
+let nextCoinDist_1;
+let coins_2;
+let nextCoinDist_2;
+
+/**
+ * type {{
+ * pos: Vector,
+ * vx: number,
+ * speed: number,
+ * angle: number,
+ * fireTick: number
+ * }[]
+ * }
+ */
+let booms;
+let nextBoomDist;
 
 /**
  * @typedef {{
@@ -79,9 +124,9 @@ let player_2;
 let zone = 0;
 let isJumping = true;
 function update() {
-  // display middle bar
+  // // display middle bar
   color("light_yellow");
-  rect(0, 60, 250, 40);
+  rect(0, 100, 250, 1);
 
   // initiate variables
   if (!ticks) {
@@ -100,64 +145,64 @@ function update() {
     };
     bullets = [];
     nextBulletDist = 0;
-    
-  }
 
+    booms = [];
+    nextBoomDist = 0;
+
+    coins_1 = [];
+    nextCoinDist_1 = 0;
+
+    coins_2 = [];
+    nextCoinDist_2 = 0;
+  }
   const scr = difficulty;
   nextFloorDist -= scr;
-
-  // if(player_1.pos.y < G.HEIGHT * 0.5) {
-  //   zone = 0;
-  // } else {
-  //   zone = 1;
-  // }
-  if (zone == 0) {// if the player is at zone 0
-    if (isJumping) {
-      if (input.isJustPressed) {
-        play("jump");
-        play("hit");
-        player_1.vy = -2 * sqrt(difficulty);
+  if (isJumping) {
+    if(input.isJustPressed) {
+      play("jump");
+      play("hit");
+      player_1.vy = -2 * sqrt(difficulty);
+    }
+    const pp = vec(player_1.pos);
+    if (input.isPressed) {
+      player_1.vy += 0.005 * difficulty;
+      if (zone == 0) {
+        player_1.pos.y -= player_1.vy;
+      } else {
+        player_1.pos.y += player_1.vy;
       }
-      const pp = vec(player_1.pos);
-      player_1.vy += (input.isPressed ? 0.05 : 0.2) * difficulty;
-      player_1.pos.y -= player_1.vy;
-      const op = vec(player_1.pos).sub(pp).div(9);
-      color("white");
-      times(9, () => {
-        pp.add(op);
-        box(pp, 6);
-      });
     } else {
-      if (input.isJustPressed) {
-        play("jump");
-        player_1.vy = 2 * sqrt(difficulty);
-        isJumping = true;
+      player_1.vy += 0.2 * difficulty;
+      if (zone == 0) {
+        player_1.pos.y -= player_1.vy;
+      } else {
+        player_1.pos.y += player_1.vy;
       }
     }
-  } else { // if the player is at zone 1
-    if (isJumping) {
-      if (input.isJustPressed) {
-        play("jump");
-        play("hit");
-        player_1.vy = -2 * sqrt(difficulty);
-      }
-      const pp = vec(player_1.pos);
-      player_1.vy += (input.isPressed ? 0.05 : 0.2) * difficulty;
-      player_1.pos.y += player_1.vy;
-      const op = vec(player_1.pos).sub(pp).div(9);
-      color("white");
-      times(9, () => {
-        pp.add(op);
-        box(pp, 6);
-      });
-    } else {
-      if (input.isJustPressed) {
-        play("jump");
-        player_1.vy = -2 * sqrt(difficulty);
-        isJumping = true;
-      }
+    const op = vec(player_1.pos).sub(pp).div(9);
+    
+    color("white");
+    times(9, () => {
+      pp.add(op);
+       box(pp, 6);
+    });
+  } else {
+    if (input.isJustPressed) {
+      play("jump");
+      player_1.vy = -2 * sqrt(difficulty);
+      isJumping = true;
     }
   }
+  
+  //check which zone
+  if (input.isJustReleased) {
+    if(player_1.pos.y < G.HEIGHT * 0.5) {
+    zone = 0;
+    } else {
+    zone = 1;
+    }
+  }
+  
   // generate moving floor
   if (nextFloorDist < 0) {
     const width = rnd(40, 80);
@@ -196,17 +241,11 @@ function update() {
   color("black");
   char("b", player_2.pos);
 
-  if(player_1.pos.y <= G.HEIGHT * 0.5) {
-    zone = 0;
-  } else {
-    zone = 1;
-  }
-
   // bullets
   nextBulletDist += scr;
   if (nextBulletDist > 250) {
-    bullets.push({ pos: vec(0, rndi(10,50)), vx: rnd(1, difficulty) * 0.3});
-    nextBulletDist -= rnd(50, 80) / sqrt(difficulty);
+    bullets.push({ pos: vec(0, rndi(10,100)), vx: rnd(1, difficulty) * 0.3});
+    nextBulletDist -= rnd(100, 300) / sqrt(difficulty);
   }
 
   color("black");
@@ -218,11 +257,90 @@ function update() {
       particle(b.pos);
       end();
     }
-    return b.pos.x > 250
+    return b.pos.x > 250;
+  });
+
+  // booms
+  nextBulletDist += scr;
+
+  // coins
+  nextCoinDist_1 -= scr;
+  if (nextCoinDist_1 < 0) {
+    coins_1.push ({ pos: vec(250, rndi(10, 100)), vx: rnd(1, difficulty) * 0.2});
+    nextCoinDist_1 += rnd(70, 200) / sqrt(difficulty);
+  }
+
+  color("black");
+  remove(coins_1, (c) => {
+    c.pos.x -= c.vx + scr;
+    const con = char("e", c.pos).isColliding.char;
+    if(con.a || con.b) {
+      play("coin");
+      addScore(1);
+      return true;
+    }
+    return c.pos.x < -1;
+  });
+
+  nextCoinDist_2 -= scr;
+  if (nextCoinDist_2 < 0) {
+    coins_2.push ({ pos: vec(250, rndi(100, 190)), vx: rnd(1, difficulty) * 0.2});
+    nextCoinDist_2 += rnd(30, 60) / sqrt(difficulty);
+  }
+
+  color("black");
+  remove(coins_2, (c) => {
+    c.pos.x -= c.vx + scr;
+    const con = char("f", c.pos).isColliding.char;
+    if(con.a || con.b) {
+      play("coin");
+      addScore(3);
+      return true;
+    }
+    return c.pos.x < -1;
+  });
+
+  //bomb
+  nextBoomDist -= scr;
+  if(nextBoomDist < 0) {
+    const vx = rnd() < 0.5 ? -1 : 1;
+    booms.push({ 
+      pos: vec(rndi(10, 240), 195), 
+      vx, 
+      speed: rnd(1, 1.5) * sqrt(difficulty), 
+      angle: -PI/2, 
+      fireTick: rnd(50, 400) / difficulty
+    });
+    nextBoomDist += rnd(100, 500) / sqrt(difficulty);
+  }
+
+  color("black");
+  remove(booms, (b) => {
+    if(b.fireTick > 0) {
+      console.log("b.fireTick: " + b.fireTick);
+      // b.pos.x += b.vx * 0.1 * sqrt(difficulty);
+      const b_angle = b.pos.angleTo(player_1.pos);
+      b.angle = b_angle;
+      b.fireTick--;
+      const c = char("g", b.pos);
+    } else {
+      play("laser");
+      b.pos.add(vec(b.speed, 0).rotate(b.angle));
+      const c = char("g", b.pos).isColliding.char;
+      const c_1 = char("g", b.pos).isColliding.rect;
+      if(c.a || c.b || c_1.light_yellow) {
+        play("explosion");
+        particle(b.pos);
+        if(c.a || c.b) {
+          end();
+        }
+        return true;
+      }
+    }
   });
 
   // check out of bound
-  if(player_2.pos.y < 0 || player_1.pos.y > 150) {
+  if(player_2.pos.y < 0 || player_1.pos.y > G.HEIGHT) {
     play("explosion");
     end();
   }
